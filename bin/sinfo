@@ -1,0 +1,14 @@
+#!/usr/bin/env python3
+
+from glurm import db, codes
+
+if __name__ == '__main__':
+    db = db()
+
+    nodes = db.get_node_data()
+
+    print('NODE        CPUS        MEMORY       STATUS')
+    for node in nodes:
+        status = codes.node_status[node['status']]
+        print(f"{node['NID']}\t{node['ncpus_alloc']}/{node['ncpus']}\t{node['mem_alloc']}/{node['mem']}\t{status}")
+
