@@ -9,4 +9,7 @@ from glurm import db
 if __name__ == '__main__':
     log = logging.getLogger('glurm')
     db = db(log=log, init=True) # Can init;
-    db.process_q()
+
+    # We are debugging, so reset on each sprocess for now:
+    os.remove(os.path.expanduser('~/.glurm/database.db'))
+    db.setup()

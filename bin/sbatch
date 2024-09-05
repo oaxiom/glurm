@@ -2,48 +2,99 @@
 
 import sys
 import os
+import argparse
+import logging
 
-from glurm import db
+from glurm import db, parse_supported_SBATCH
 
 # Command-line options;
 def prepare_parser():
-    exmp = 'Example usage: te_count -i in.bam -o out.bam -g genome -m genes_tes'
+    exmp = 'Example usage: sbatch script.slurm'
+    description = 'Slurm-like Glurm, single node job schedule emulator.'
 
-    description = 'Counts up the number of reads that overlap some set of gene/TE or other features'
-
-    parser = argparse.ArgumentParser(prog='te_count', description=description, epilog=exmp)
+    parser = argparse.ArgumentParser(prog='sbatch', description=description, epilog=exmp)
 
     # Optional:
     optional = parser._action_groups.pop()
-    optional.add_argument('--se', action='store_true', required=False, help='Set mode to SE (single-end) mode, default is paired-end mode')
-    optional.add_argument('--sc', action='store_true', required=False, help='Set te_count to single-cell mode, default is bulk. Expects an CR:Z flag in the BAM/SAM file. Make sure you set --se appropriately')
-    optional.add_argument('--noumi', action='store_true', required=False, help='If --sc is set, but this single cell data has no UMI in a UR:Z tag, set this switch')
-    optional.add_argument('--strand', action='store_true', required=False, help='Use the strand information for the reads (protocol is strand-specific), default=False')
-    optional.add_argument('-q', '--qual', nargs=1, type=int, default=20, required=False, help='q threshold for qulait filtering, default=20')
-    optional.add_argument('--maxcells', action='store', type=int, default=10000, required=False, help='keep at most maxcells with the most reads, default=10,000')
-    optional.add_argument('-w', action='store', type=str, default='', required=False, help='A whitelist of barcodes. Becomes a requried argument of --sc')
+    optional.add_argument('-c', '--cpus-per-task', action='store', type=int, default=1, required=False, help='number of cpus required per task, default=1')
+    optional.add_argument('-e', '--error', action='store', type=int, default=1, required=False, help="File for batch script's standard error")
+    optional.add_argument('--export', action='store', type=str, required=False, help='Specify environment variables to export')
+    optional.add_argument('-J', '--job-name', action='store', type=str, required=False, help='Name of job')
+    optional.add_argument('--mem', action='store', type=int, default=0, required=False, help='Minimum amount of real memory required')
+    optional.add_argument('-o', '--output', action='store', type=str, required=False, help="file for batch script's standard output")
 
     required = parser.add_argument_group('required arguments')
+    required.add_argument('script', type=str, nargs=1, help='slurm script to run')
 
-    required.add_argument('-i', '--inbam', nargs=1, required=True, help='the BAM alignment file containing the reads')
-    required.add_argument('-o', '--outtsv', nargs=1, required=True, help='the TSV file to save the genes and count data to')
-    required.add_argument('-g', '--genome', nargs=1, required=True, help='Genome assembly to use, valid genomes: {0}'.format(te_count.common.valid_assemblies))
-    required.add_argument('-m', '--mode', nargs=1, required=True, help='Type of annotation to use, valid modes: {0}'.format(te_count.common.valid_modes))
+    #required.add_argument('-i', '--inbam', nargs=1, required=True, help='the BAM alignment file containing the reads')
 
     parser._action_groups.append(optional)
 
     logging.basicConfig(level=logging.DEBUG,
                     format='%(levelname)-8s: %(message)s',
                     datefmt='%m-%d %H:%M')
-
-    parser.log = logging.getLogger('te_count')
+    parser.log = logging.getLogger('glurm')
 
     return parser
 
 if __name__ == '__main__':
-    db = db(no_init=True)
+    assert sys.version_info >= (3, 9), 'Python >=3.9 is required'
 
+    script_path = os.path.dirname(os.path.realpath(__file__))
+    parser = prepare_parser()
+    args = parser.parse_args()
+
+    log = parser.log
+
+    print(args)
+
+    # Step 1. Parse the slurm script to see if it's valid and grab any override operatives.
+    slurm_script = args.script[0]
+    if not os.path.exists(slurm_script):
+        msg = f"Slurm script '{slurm_script}' not found"
+        log.error(msg)
+        sys.exit(msg)
+
+    __found_shebang = False
+    sbatches = []
+    with open(slurm_script, 'rt') as oh:
+        for line in oh:
+            if '#!' in line: # I guess it has to be the first, but I just check it's there.
+                __found_shebang = True
+            elif '#SBATCH' in line:
+                # An override
+                sbatches.append(line)
+
+    if sbatches:
+        parse_supported_SBATCH(sbatches, args)
+
+    if not __found_shebang:
+        msg = f"Slurm script did not contain a #! line"
+        log.error(msg)
+        sys.exit(msg)
+
+    db = db(log=log, init=False)
+
+    # Step 2. Can we reserve this on the nodes?
+    # Check CPUs
+    if not db.node_can_accomodate_task(args.cpus_per_task): # TODO add memory and other asks.
+        msg = f'Cannot find a Suitable node for CPUS={args.cpus_per_task}'
+        log.error(msg)
+        sys.exit(msg)
+
+    # Step 3. Add the task to the queue
     jid = db.reserve_next_jid()
+
+    if not args.job_name:
+        args.job_name = f'glurm-{jid}'
+
+    if not args.output:
+        args.output = f'glurm-{jid}.out'
+
+    if not args.error:
+        args.output = f'glurm-{jid}.err'
+
+    db.add_task(jid, args)
 
     print(f'Submitted Job {jid}')
 

@@ -1,9 +1,12 @@
 #!/usr/bin/env python3
 
+import logging
+
 from glurm import db, codes
 
 if __name__ == '__main__':
-    db = db()
+    log = logging.getLogger('glurm')
+    db = db(log=log, init=False)
 
     nodes = db.get_node_data()
 
