@@ -1,0 +1,17 @@
+#/usr/bin/env python3
+
+from .sprocess import open_db
+
+if __name__ == '__main__':
+    con, cur = open_db()
+
+    to_get = ['JID', 'name', 'time_added_to_q', 'time_started', 'status', 'ncpus', 'memory']
+    to_get_str = ', '.join(to_get)
+
+    cur.execute(f'SELECT ({to_get_str}) FROM jobs')
+    cur.fetchall()
+
+    print('JID\tNAME\tTIME')
+    for job in res:
+        job = {'JID': job[0, 'name', 'time_added_to_q', 'time_started', 'status', 'ncpus', 'memory'}
+        print(f'JID: {job["JID"]} name: {job["name"]} status: {job["status"]}')

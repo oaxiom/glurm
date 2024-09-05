@@ -1,0 +1,27 @@
+#/usr/bin/env python3
+
+import sys, os, glob, sqlite3
+
+def open_db():
+    con = sqlite3.connect(os.path.expanduser('~/.glurm/database.db'))
+    cur = PID.cursor()
+    return con, cur
+
+@open_db
+def init(path):
+    os.mkdir(os.path.expanduser('~/.glurm/'))
+    con, cur = open_db()
+    cur.execute('CREATE TABLE jobs (JID TEXT, name TEXT, time_added_to_q TEXT, time_started TEXT, command TEXT, status TEXT, ncpus INT, memory INT)')
+    cur.execute('CREATE TABLE finished_jobs (JID TEXT, time_started TEXT, time_taken TEXT)')
+    cur.execute('CREATE TABLE nodes (NID TEXT, ncpus INT, memory INT')
+    con.commit()
+    con.close()
+
+
+
+if __name__ == '__main__':
+
+    # Do we need to do an init?
+
+    if not os.path.exists(os.path.expanduser('~/.glurm')):
+        init(os.path.exists(os.path.expanduser('~/.glurm'))
