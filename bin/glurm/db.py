@@ -29,7 +29,29 @@ class db:
         self.con = sqlite3.connect(os.path.expanduser('~/.glurm/database.db'))
         self.cur = self.con.cursor()
 
-        self.cur.execute('CREATE TABLE jobs (jid INT, name TEXT, time_added_to_q TEXT, time_started TEXT, command TEXT, status TEXT, ncpus INT, memory INT, stdout TEXT, stderr TEXT)')
+        # This table gets a bit complicated:
+
+        jobs_table = '''CREATE TABLE jobs (
+            jid INT,
+            pid INT,
+            cwd TEXT,
+            script TEXT,
+            name TEXT,
+            time_added_to_q TEXT,
+            time_started TEXT,
+            command TEXT,
+            status TEXT,
+            ncpus INT,
+            memory INT,
+            stdout TEXT,
+            stderr TEXT
+            )
+        '''
+
+        self.cur.execute(jobs_table)
+
+
+
         self.cur.execute('CREATE TABLE finished_jobs (jid INT, time_started TEXT, time_taken TEXT)')
 
         # Set up the nodes;
@@ -98,15 +120,25 @@ class db:
             nodes.append(node)
         return nodes
 
-    def get_jobs_list(self):
+    def get_jobs_list(self, running_only=False, waiting_only=False):
         """
         Return all the pertinent details of the jobs.
 
         Running jobs need to go on top.
         """
+        assert not (waiting_only and running_only), "Can't have both running_only and waiting_only"
 
-        self.cur.execute('SELECT jid, name, time_added_to_q, time_started, status FROM jobs')
+        if running_only:
+            self.cur.execute('SELECT jid, name, time_added_to_q, time_started, status FROM jobs WHERE status="R"')
+        elif waiting_only:
+            self.cur.execute('SELECT jid, name, time_added_to_q, time_started, status FROM jobs WHERE status="R"')
+        else:
+            self.cur.execute('SELECT jid, name, time_added_to_q, time_started, status FROM jobs')
+
         jobs = self.cur.fetchall()
+
+        if not jobs:
+            return None
 
         labeled_jobs = []
         for j in jobs:
@@ -140,14 +172,22 @@ class db:
 
         return next_jid
 
-    def add_task(self, jid, args):
+    def add_task(self, jid, args, pwd):
         """
 
         Add an task to the queue.
 
         """
+
+        script = None
+        with open(args.script[0], 'rt') as oh:
+            script = oh.read()
+
         sql_dict = {
             'jid': jid,
+            'pid': 0,
+            'script': script, # 2Gb limit
+            'pwd': pwd,
             'name': args.job_name,
             'time_added_to_q': str(time.time()),
             'time_started': '',
@@ -176,10 +216,35 @@ class db:
     def process_q(self):
         """
 
-        Here's the bg logic controller.
+        Here's the logic controller.
 
         Suggested to run every ~10s or so.
 
         """
-        pass
+        # Step 1, update the node status, see if jobs have finished.
+
+        self.cur.execute('SELECT jid, pid, status FROM jobs WHERE status="R"')
+        res = self.cur.fetchall()
+
+        print(res)
+        # Step 1. See if any running scripts are done.
+        running_jobs = self.get_jobs_list(running_only=True)
+        if running_jobs:
+            for job in running_jobs:
+                # check if pid is done
+                print(job['pid'])
+
+        # Step 2. Go through the list, from top to bottom, and see if any of the jobs will fit on the Q.
+        waiting_jobs = self.get_jobs_list(waiting_only=True)
+
+        # TODO: sort by time on q:
+
+        if waiting_jobs:
+            for job in waiting_jobs:
+                pass
+
+        # command entrance is like this:
+        #pid = Popen(["/bin/mycmd", "myarg"]).pid
+        return
+
 

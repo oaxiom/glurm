@@ -94,7 +94,7 @@ if __name__ == '__main__':
     if not args.error:
         args.output = f'glurm-{jid}.err'
 
-    db.add_task(jid, args)
+    db.add_task(jid, args, os.getcwd())
 
     print(f'Submitted Job {jid}')
 
