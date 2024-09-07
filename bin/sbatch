@@ -17,7 +17,7 @@ def prepare_parser():
     # Optional:
     optional = parser._action_groups.pop()
     optional.add_argument('-c', '--cpus-per-task', action='store', type=int, default=1, required=False, help='number of cpus required per task, default=1')
-    optional.add_argument('-e', '--error', action='store', type=int, default=1, required=False, help="File for batch script's standard error")
+    optional.add_argument('-e', '--error', action='store', type=str, required=False, help="File for batch script's standard error")
     optional.add_argument('--export', action='store', type=str, required=False, help='Specify environment variables to export')
     optional.add_argument('-J', '--job-name', action='store', type=str, required=False, help='Name of job')
     optional.add_argument('--mem', action='store', type=int, default=0, required=False, help='Minimum amount of real memory required')
@@ -46,7 +46,7 @@ if __name__ == '__main__':
 
     log = parser.log
 
-    print(args)
+    #print(args)
 
     # Step 1. Parse the slurm script to see if it's valid and grab any override operatives.
     slurm_script = args.script[0]
@@ -77,7 +77,7 @@ if __name__ == '__main__':
 
     # Step 2. Can we reserve this on the nodes?
     # Check CPUs
-    if not db.node_can_accomodate_task(args.cpus_per_task): # TODO add memory and other asks.
+    if not db.node_can_accomodate_task(args.cpus_per_task): # TODO: add memory and other asks.
         msg = f'Cannot find a Suitable node for CPUS={args.cpus_per_task}'
         log.error(msg)
         sys.exit(msg)
@@ -92,7 +92,7 @@ if __name__ == '__main__':
         args.output = f'glurm-{jid}.out'
 
     if not args.error:
-        args.output = f'glurm-{jid}.err'
+        args.error = f'glurm-{jid}.err'
 
     db.add_task(jid, args, os.getcwd())
 

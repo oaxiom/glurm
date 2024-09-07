@@ -12,5 +12,5 @@ if __name__ == '__main__':
 
     print('JID\tNAME\tTIME ON Q\tTIME RUNNING\tSTATUS')
     for job in jobs:
-        print(f'{job["jid"]}\tname: {job["name"]} Time queing: {job["time_queing"]} Time running: {job["time_running"]} {codes.job_status[job["status"]]}')
+        print(f'{job["jid"]}\t{job["name"]} Time queing: {job["time_queing"]} Time running: {job["time_running"]} {codes.job_status[job["status"]]}')
 
