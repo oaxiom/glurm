@@ -277,8 +277,8 @@ class db:
             )
         PID = cmd.pid 
         
-        self.cur.execute('UPDATE jobs SET tmp_filename=? WHERE jid=?', (tmp_filename, job['jid']))
-        self.cur.execute('UPDATE jobs SET pid=? WHERE jid=?', (PID, job['jid']))
+        self.cur.execute('UPDATE jobs SET tmp_filename=?, pid=? WHERE jid=?', (tmp_filename, PID, job['jid']))
+        #self.cur.execute('UPDATE jobs SET pid=? WHERE jid=?', (, job['jid']))
         self.con.commit()
 
     def process_q(self):
