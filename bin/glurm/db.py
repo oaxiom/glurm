@@ -6,8 +6,59 @@ import time
 import subprocess
 import random
 import stat
+import threading
 
-from .utils import convert_seconds
+from .utils import convert_seconds, pid_exists
+
+class ThreadWithReturnValue(threading.Thread):
+    def __init__(self, group=None, target=None, name=None, args=(), kwargs={}, Verbose=None):
+        threading.Thread.__init__(self, group, target, name, args, kwargs)
+        self._return = None
+
+    def run(self):
+        if self._target is not None:
+            self._return = self._target(*self._args,
+                                                **self._kwargs)
+    def join(self, *args):
+        threading.Thread.join(self, *args)
+        return self._return
+
+def submit_job(job, node):
+    tmp_filename = f'/tmp/glurm.{time.time():.0f}.{job["jid"]}.{node["nid"]}.{job["command"]}'
+    with open(tmp_filename, 'wt') as oh:
+        oh.write(job['script'])
+    os.chmod(tmp_filename, stat.S_IXUSR|stat.S_IRUSR)
+    
+    # THis needs to be launched as a separate thread that become independent of this python instance.
+    
+    # TODO: Support for default join
+    stderr = None
+    stdout = None
+    if job["stdout"]: 
+        stdout = open(job["stdout"], 'wt')
+    if job["stderr"]: 
+        stderr = open(job["stderr"], 'wt')
+    else:
+        stderr = stdout # Both can be None
+    
+    cmd = subprocess.Popen(tmp_filename,
+        stdout=stdout,
+        stderr=stderr,
+        cwd=job['cwd'],
+        shell=True,
+        )
+    PID = cmd.pid 
+    
+    return PID
+    
+    #cmd.wait()
+    
+    # Find out if job finished.
+    #if job["stderr"]: 
+    #    stdout.close()
+    #if job["stdout"]: 
+    #    stderr.close()
+    
 
 class db:
     def __init__(self, log, init=False):
@@ -248,7 +299,7 @@ class db:
         # Reserve the node and set the job to running
         # Does it take all of the node, or some of the node?
         # TODO: Should be doen in one command to reduce race conditions;
-        print(job)
+        #print(job)
         self.cur.execute('UPDATE node_status SET status="M", cpus_allocated=? WHERE nid=?', (job['ncpus'], node['nid']))
         self.cur.execute('UPDATE jobs SET status="R" WHERE jid=?', (job['jid'],))
         self.con.commit()
@@ -260,25 +311,15 @@ class db:
             self.cur.execute('UPDATE node_status SET status="A" WHERE nid=?', (node['nid'], ))
             self.con.commit()
         
+
         # Run the job, get a PID and update the DB
+        thread = ThreadWithReturnValue(target=submit_job, args=(job, node))
+        thread.start()
+        PID = thread.join()
+        print(f'Started {job["jid"]} with PID {PID}')
         
-        tmp_filename = f'/tmp/glurm.{time.time():.0f}.{job["jid"]}.{node["nid"]}.{job["command"]}'
-        with open(tmp_filename, 'wt') as oh:
-            oh.write(job['script'])
-        os.chmod(tmp_filename, stat.S_IXUSR)
-        
-        # THis needs to be launched as a separate thread that become independent of this python instance.
-        print(job)
-        cmd = subprocess.Popen(tmp_filename,
-            #stdout=job['stdout'],
-            #stderr=job['stderr'],
-            cwd=job['cwd'],
-            shell=True,
-            )
-        PID = cmd.pid 
-        
-        self.cur.execute('UPDATE jobs SET tmp_filename=?, pid=? WHERE jid=?', (tmp_filename, PID, job['jid']))
-        #self.cur.execute('UPDATE jobs SET pid=? WHERE jid=?', (, job['jid']))
+        #self.cur.execute('UPDATE jobs SET tmp_filename=?, pid=? WHERE jid=?', (tmp_filename, PID, job['jid']))
+        self.cur.execute('UPDATE jobs SET pid=? WHERE jid=?', (PID, job['jid']))
         self.con.commit()
 
     def process_q(self):
@@ -294,7 +335,10 @@ class db:
         if running_jobs:
             for job in running_jobs:
                 # check if pid is done
-                print(job['pid'])
+                if pid_exists(job['pid']):
+                    print('Job still running:', job['pid'])
+                else:
+                    print('Job finished:', job['pid'])
 
         # Step 2. Go through the list, from top to bottom, and see if any of the jobs will fit on the Q.
         waiting_jobs = self.get_jobs_list(waiting_only=True)
@@ -310,6 +354,7 @@ class db:
                         self.allocate_job_to_node(job, node)
                         self.log.info(f'Allocated {job["jid"]} to node {node["nid"]}')
                         break
+                        
                     elif node['status'] == 'M':
                         # Okay... Need to see if space available.     
                         pass           

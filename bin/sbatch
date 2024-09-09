@@ -91,8 +91,9 @@ if __name__ == '__main__':
     if not args.output:
         args.output = f'glurm-{jid}.out'
 
-    if not args.error:
-        args.error = f'glurm-{jid}.err'
+    # If error not specified, just send it to out;
+    #if not args.error:
+    #    args.error = f'glurm-{jid}.err'
 
     db.add_task(jid, args, os.getcwd())
 
