@@ -108,7 +108,15 @@ class db:
         self.cur.execute(jobs_table)
 
         # TODO: Sort this out to store relevant data
-        self.cur.execute('CREATE TABLE finished_jobs (jid INT, time_started TEXT, time_taken TEXT)')
+        finished_jobs_table = '''
+        CREATE TABLE finished_jobs (
+            jid INT, 
+            name TEXT,
+            time_started TEXT, 
+            time_taken TEXT
+            )
+        '''
+        self.cur.execute(finished_jobs_table)
 
         # Set up the nodes;
         # We are doing a single node, single computer setup;
@@ -322,6 +330,14 @@ class db:
         self.cur.execute('UPDATE jobs SET pid=? WHERE jid=?', (PID, job['jid']))
         self.con.commit()
 
+    def finish_job(self, job):
+        """
+        Finish the job. remove it from the job pool and free it's resources.
+        """
+        # copy the job details to the finished_jobs pool
+        
+        
+
     def process_q(self):
         """
 
@@ -339,6 +355,7 @@ class db:
                     print('Job still running:', job['pid'])
                 else:
                     print('Job finished:', job['pid'])
+                    self.finish_job(job)
 
         # Step 2. Go through the list, from top to bottom, and see if any of the jobs will fit on the Q.
         waiting_jobs = self.get_jobs_list(waiting_only=True)
