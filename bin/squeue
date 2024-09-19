@@ -13,8 +13,8 @@ if __name__ == '__main__':
 
     jobs = db.get_jobs_list()
 
-    print('JID\tNAME\tTIME ON Q\tTIME RUNNING\tSTATUS')
+    print(f'{"JID":<15}{"NAME":<25}{"TIME ON Q":<14}{"TIME RUNNING":<14}{"STATUS":<12}')
     if jobs:
         for job in jobs:
-            print(f'{job["jid"]}\t{job["name"]} Time queing: {job["time_queing"]} Time running: {job["time_running"]} {codes.job_status[job["status"]]}')
+            print(f'{job["jid"]:<15}{job["name"]:<25}{job["time_queing"]:<14}{job["time_running"]:<14}{codes.job_status[job["status"]]:<12}')
 

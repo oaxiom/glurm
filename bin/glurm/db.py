@@ -84,8 +84,8 @@ class db:
             cwd TEXT,
             script TEXT,
             name TEXT,
-            time_added_to_q REAL,
-            time_started REAL,
+            time_added_to_q INT,
+            time_started INT,
             command TEXT,
             status TEXT,
             ncpus INT,
@@ -104,8 +104,8 @@ class db:
         CREATE TABLE finished_jobs (
             jid INT,
             name TEXT,
-            time_started REAL,
-            time_taken REAL
+            time_started INT,
+            time_taken INT
             )
         '''
         self.cur.execute(finished_jobs_table)
@@ -195,11 +195,11 @@ class db:
         for j in jobs:
             j = dict(j)
 
-            if j['time_started'] != '': #time_started:
-                time_queing = '-'
-                time_running = convert_seconds(int(time.time() - float(j['time_started'])))
+            if j['time_started'] != -1: #time_started:
+                time_queing = convert_seconds(j['time_started'] - j['time_added_to_q'])
+                time_running = convert_seconds(int(time.time() - j['time_started']))
             else:
-                time_queing = convert_seconds(int(time.time() - float(j['time_added_to_q'])))
+                time_queing = convert_seconds(int(time.time() - j['time_added_to_q']))
                 time_running = '-'
 
             j['time_queing'] = time_queing
@@ -280,8 +280,8 @@ class db:
             'cwd': pwd,
             'script': script, # 2Gb limit
             'name': args.job_name,
-            'time_added_to_q': time.time(),
-            'time_started': 0.0,
+            'time_added_to_q': int(time.time()),
+            'time_started': -1,
             'command': str(args.script[0]),
             'status': 'W',
             'ncpus': args.cpus_per_task,
