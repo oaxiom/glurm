@@ -2,20 +2,13 @@
 # Intro
 
 Hi there kids! 
-
-Would you like to run slurm?
-
-Do you need to run it on a single computer that has no network access? 
-
-Do you want it to be in pure python with no dependencies at all? 
-
-Do you want lots of missing features that may or may not be implemented in the future?
-
-Do you want lots of potential bugs in this non-battle hardened code?
-
-If you answered yes to all of the above, then have I got the software for you!
-
-Introducing glurm! The drop in slurm replacement!
+- Would you like to run slurm?
+- Do you need to run it on a single computer that has no network access? 
+- Do you want it to be in pure python with no dependencies at all? 
+- Do you want lots of missing features that may or may not be implemented in the future?
+- Do you want lots of potential bugs in this non-battle hardened code?
+- If you answered yes to all of the above, then have I got the software for you!
+- Introducing glurm! The drop in slurm replacement!
 
 Advantages:
 - Pure python, absolutely no dependencies past python3!
@@ -69,13 +62,6 @@ options:
 Example usage: sbatch script.slurm
 ```
 
-```
-
-
-
-```
-
-
-
-
 MIT license. Use at your own risk
+
+
