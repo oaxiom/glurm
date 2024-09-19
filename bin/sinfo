@@ -5,17 +5,20 @@ import logging
 from glurm import db, codes, utils
 
 if __name__ == '__main__':
+    logging.basicConfig(level=logging.DEBUG,
+                    format='%(levelname)-8s: %(message)s',
+                    datefmt='%m-%d %H:%M')
     log = logging.getLogger('glurm')
     db = db(log=log, init=False)
 
-    nodes = db.get_node_data()
+    nodes = db.get_node_states(idle_or_mixed_only=False)
 
     print('NODE        CPUS        MEMORY       STATUS')
     for node in nodes:
         status = codes.node_status[node['status']]
-        
+
         mem_alloc = utils.bytes_convertor(node['mem_allocated'])['G']
         mem_total = utils.bytes_convertor(node['memory_total'])['G']
-        
+
         print(f"{node['nid']}\t{node['cpus_allocated']}/{node['ncpus_total']}\t{mem_alloc}/{mem_total}G\t{status}")
 

@@ -8,7 +8,7 @@ import random
 import stat
 import threading
 
-from .utils import convert_seconds, pid_exists
+from .utils import convert_seconds, pid_exists, bytes_convertor2
 
 class ThreadWithReturnValue(threading.Thread):
     def __init__(self, group=None, target=None, name=None, args=(), kwargs={}, Verbose=None):
@@ -17,8 +17,8 @@ class ThreadWithReturnValue(threading.Thread):
 
     def run(self):
         if self._target is not None:
-            self._return = self._target(*self._args,
-                                                **self._kwargs)
+            self._return = self._target(*self._args, **self._kwargs) # PID
+
     def join(self, *args):
         threading.Thread.join(self, *args)
         return self._return
@@ -29,9 +29,7 @@ def submit_job(job, node):
         oh.write(job['script'])
     os.chmod(tmp_filename, stat.S_IXUSR|stat.S_IRUSR)
 
-    # THis needs to be launched as a separate thread that become independent of this python instance.
-
-    # TODO: Support for default join
+    # TODO: Support for default join of stdout and stderr
     stderr = None
     stdout = None
     if job["stdout"]:
@@ -41,24 +39,17 @@ def submit_job(job, node):
     else:
         stderr = stdout # Both can be None
 
-    cmd = subprocess.Popen(tmp_filename,
+    cmd = subprocess.Popen(
+        tmp_filename,
         stdout=stdout,
         stderr=stderr,
         cwd=job['cwd'],
         shell=True,
         )
+
     PID = cmd.pid
 
     return PID
-
-    #cmd.wait()
-
-    # Find out if job finished.
-    #if job["stderr"]:
-    #    stdout.close()
-    #if job["stdout"]:
-    #    stderr.close()
-
 
 class db:
     def __init__(self, log, init=False):
@@ -93,15 +84,16 @@ class db:
             cwd TEXT,
             script TEXT,
             name TEXT,
-            time_added_to_q TEXT,
-            time_started TEXT,
+            time_added_to_q REAL,
+            time_started REAL,
             command TEXT,
             status TEXT,
             ncpus INT,
             memory INT,
             stdout TEXT,
             stderr TEXT,
-            tmp_filename TEXT
+            tmp_filename TEXT,
+            node_used INT
             )
         '''
 
@@ -112,8 +104,8 @@ class db:
         CREATE TABLE finished_jobs (
             jid INT,
             name TEXT,
-            time_started TEXT,
-            time_taken TEXT
+            time_started REAL,
+            time_taken REAL
             )
         '''
         self.cur.execute(finished_jobs_table)
@@ -135,7 +127,7 @@ class db:
         #svmem = psutil.virtual_memory()
         data = dict(
             ncpus = os.cpu_count(),
-            mem = 8000000000, # Surpsingly no easy way to do this...
+            mem = bytes_convertor2('8G'), # Surpsringly no easy way to do this...
             nid = 'node001',
             status = 'I',
             ncpus_alloc = 0,
@@ -154,12 +146,13 @@ class db:
 
         self.log.info('Set up databases')
 
-    def node_can_accomodate_task(self, ncpus:int=1, maxmem:int=1) -> bool:
+    def can_any_node_can_accomodate_job(self, ncpus:int=1, maxmem:int=0) -> bool:
         """
         Work out if at least one node is available that can run this task for some list of criteria
         """
         self.cur.execute('SELECT ncpus_total, memory_total FROM node_status')
         nodes = self.cur.fetchall()
+
         for node in nodes:
             if ncpus <= node[0] and maxmem <= node[1]:
                 return True
@@ -168,19 +161,15 @@ class db:
     def commit(self):
         self.con.commit()
 
-    def get_handlers(self):
-        # Ideally all changes should be done here;
-        return con, cur
-
-    def get_node_data(self):
+    def get_job_data(self, job:dict) -> dict:
         """
         Return the node details. This is for sinfo. There is another function that packs the
         data for internal use.
         """
-        self.cur.execute('SELECT * FROM node_status')
+        self.cur.execute('SELECT * FROM jobs WHERE jid=?', (job['jid'], ))
         res = self.cur.fetchall()
-        nodes = [dict(node) for node in res]
-        return nodes
+        job = dict(res)
+        return job
 
     def get_jobs_list(self, running_only=False, waiting_only=False):
         """
@@ -261,8 +250,6 @@ class db:
         anode['ncpus_avail'] = node['ncpus_total'] - node['cpus_allocated']
         anode['mem_avail'] = node['memory_total'] - node['mem_allocated']
 
-        print(anode)
-
         return anode
 
     def reserve_next_jid(self):
@@ -293,8 +280,8 @@ class db:
             'cwd': pwd,
             'script': script, # 2Gb limit
             'name': args.job_name,
-            'time_added_to_q': str(time.time()),
-            'time_started': '',
+            'time_added_to_q': time.time(),
+            'time_started': 0.0,
             'command': str(args.script[0]),
             'status': 'W',
             'ncpus': args.cpus_per_task,
@@ -302,6 +289,7 @@ class db:
             'stdout': args.output,
             'stderr': args.error,
             'tmp_filename': '',
+            'node_used': -1,
             }
 
         zipped = []
@@ -316,39 +304,46 @@ class db:
 
         # JID INT PRIMARY KEY, name TEXT, time_added_to_q TEXT, time_started TEXT, command TEXT, status TEXT, ncpus INT, memory INT, stdout TEXT, stderr TEXT
 
-    def check_if_node_can_accomodate_job(self, job, node):
+    def node_can_accomodate_job(self, job, node):
         """
         Check if this job will fit on the node, return True or False
 
         """
         node_data = self.get_node_state(node['nid'])
 
+        cpus_to_allocate = node_data['cpus_allocated']+job['ncpus']
+        mem_to_allocate = node_data['mem_allocated']+job['memory']
+
+        if cpus_to_allocate > node_data['ncpus_avail']:
+            return False
+        if mem_to_allocate > node_data['mem_avail']:
+            return False
+
+        # Can't see a reason it can't be allocated to this node;
+        return True
+
     def allocate_job_to_node(self, job, node):
         """
-        Allocate the job to a node, set all statuses in the DB
-        """
+        Allocate the job to a node, set all statuses in the DB, see if the node is full.
 
-        # Reserve the node and set the job to running
-        # Does it take all of the node, or some of the node?
-        # TODO: Should be done in one SQL command to reduce race conditions;
+        """
         node_data = self.get_node_state(node['nid'])
 
         # Get our node;
-        cpus_to_allocate = node_data['cpus_allocated']+job['ncpus']
-        mem_to_allocate = node_data['mem_allocated']+job['memory']
+        cpus_to_allocate = node_data['cpus_allocated'] + job['ncpus']
+        mem_to_allocate = node_data['mem_allocated'] + job['memory']
 
         if cpus_to_allocate >= node_data['ncpus_total'] or mem_to_allocate > node_data['memory_total']:
             self.cur.execute('UPDATE node_status SET status="A", cpus_allocated=?, mem_allocated=? WHERE nid=?', (cpus_to_allocate, mem_to_allocate, node['nid']))
         else:
             self.cur.execute('UPDATE node_status SET status="M", cpus_allocated=?, mem_allocated=? WHERE nid=?', (cpus_to_allocate, mem_to_allocate, node['nid']))
 
-        self.cur.execute('UPDATE jobs SET status="R" WHERE jid=?', (job['jid'],))
+        self.cur.execute('UPDATE jobs SET status="R", time_started=?, node_used=? WHERE jid=?', (time.time(), node['nid'], job['jid']))
         self.con.commit()
 
         # See if the node is now full
-        self.cur.execute('SELECT cpus_allocated, ncpus_total FROM node_status WHERE nid=?', (node['nid'], ))
-        res = self.cur.fetchone()
-        if res['cpus_allocated'] >= res['ncpus_total']:
+        node_data = self.get_node_state(node['nid'])
+        if node_data['cpus_allocated'] >= node_data['ncpus_total'] or node_data["mem_allocated"] > node_data['memory_total']:
             self.cur.execute('UPDATE node_status SET status="A" WHERE nid=?', (node['nid'], ))
             self.con.commit()
 
@@ -356,7 +351,7 @@ class db:
         thread = ThreadWithReturnValue(target=submit_job, args=(job, node))
         thread.start()
         PID = thread.join()
-        print(f'Started {job["jid"]} with PID {PID}')
+        self.log.info(f'Started {job["jid"]} with PID {PID}')
 
         #self.cur.execute('UPDATE jobs SET tmp_filename=?, pid=? WHERE jid=?', (tmp_filename, PID, job['jid']))
         self.cur.execute('UPDATE jobs SET pid=? WHERE jid=?', (PID, job['jid']))
@@ -367,13 +362,48 @@ class db:
         Finish the job. remove it from the job pool and free it's resources.
         """
         # copy the job details to the finished_jobs pool
-
+        """
+        CREATE TABLE finished_jobs (
+            jid INT,
+            name TEXT,
+            time_started TEXT,
+            time_taken TEXT
+            )
+        """
+        job['time_running'] = int(job['time_started'] - time.time()) # set finish time;
+        self.cur.execute('INSERT INTO finished_jobs VALUES (:jid, :name, :time_started, :time_running)', job)
         # Delete the job from the job queue
+        self.cur.execute('DELETE FROM jobs WHERE jid=?', (job['jid'],))
+        self.con.commit() # Make sure job is finished before proceeding;
 
         # Free the resources on the nodes
+        cpus_freed = job['ncpus']
+        mem_freed = job['memory']
+        node_data = self.get_node_state(job['node_used'])
+
+        new_cpus_allocated = node_data['cpus_allocated'] - cpus_freed
+        if new_cpus_allocated < 0: new_cpus_allocated = 0 # Stop weird cases
+        new_mem_allocated = node_data['mem_allocated'] - mem_freed
+        if new_mem_allocated < 0: new_mem_allocated = 0 # Stop weird cases
+
+        self.cur.execute('UPDATE node_status SET cpus_allocated=?, mem_allocated=? WHERE nid=?', (new_cpus_allocated, new_mem_allocated, job['node_used']))
+
+        # Figure out if it's I, M or A
+        if new_cpus_allocated >= node_data['ncpus_total']:
+            self.cur.execute('UPDATE node_status SET status=? WHERE nid=?', ("A", job['node_used']))
+
+        elif new_mem_allocated >= node_data['memory_total']:
+            self.cur.execute('UPDATE node_status SET status=? WHERE nid=?', ("A", job['node_used']))
+
+        elif new_mem_allocated >= 1 or new_cpus_allocated >= 1:
+            self.cur.execute('UPDATE node_status SET status=? WHERE nid=?', ("M", job['node_used']))
+
+        else:
+            self.cur.execute('UPDATE node_status SET status=? WHERE nid=?', ("I", job['node_used']))
+
+        self.con.commit()
 
         return
-
 
     def process_q(self):
         """
@@ -389,9 +419,9 @@ class db:
             for job in running_jobs:
                 # check if pid is done
                 if pid_exists(job['pid']):
-                    print('Job still running:', job['pid'])
+                    self.log.info(f'Job running: JID={job["jid"]} PID={job["pid"]}')
                 else:
-                    print('Job finished, cleaning up:', job['pid'])
+                    self.log.info(f'Job finished: JID={job["jid"]} PID={job["pid"]}')
                     self.finish_job(job)
 
         # Step 2. Go through the list, from top to bottom, and see if any of the jobs will fit on the Q.
@@ -405,9 +435,9 @@ class db:
                 for node in node_status:
                     if node['status'] == 'I' or node['status'] == 'M':
                         # Yes, free node.
-                        if self.check_if_node_can_accomodate_job(job, node):
+                        if self.node_can_accomodate_job(job, node):
                             self.allocate_job_to_node(job, node)
-                            self.log.info(f'Allocated {job["jid"]} to node {node["nid"]}')
+                            self.log.info(f'Allocated JID={job["jid"]} to node {node["nid"]}')
                             break
 
         return

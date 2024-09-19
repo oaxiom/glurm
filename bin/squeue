@@ -5,12 +5,16 @@ import logging
 from glurm import db, codes
 
 if __name__ == '__main__':
+    logging.basicConfig(level=logging.DEBUG,
+                    format='%(levelname)-8s: %(message)s',
+                    datefmt='%m-%d %H:%M')
     log = logging.getLogger('glurm')
     db = db(log=log, init=False)
 
     jobs = db.get_jobs_list()
 
     print('JID\tNAME\tTIME ON Q\tTIME RUNNING\tSTATUS')
-    for job in jobs:
-        print(f'{job["jid"]}\t{job["name"]} Time queing: {job["time_queing"]} Time running: {job["time_running"]} {codes.job_status[job["status"]]}')
+    if jobs:
+        for job in jobs:
+            print(f'{job["jid"]}\t{job["name"]} Time queing: {job["time_queing"]} Time running: {job["time_running"]} {codes.job_status[job["status"]]}')
 

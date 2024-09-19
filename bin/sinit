@@ -7,6 +7,9 @@ import logging
 from glurm import db
 
 if __name__ == '__main__':
+    logging.basicConfig(level=logging.DEBUG,
+                    format='%(levelname)-8s: %(message)s',
+                    datefmt='%m-%d %H:%M')
     log = logging.getLogger('glurm')
     db = db(log=log, init=True) # Can init;
 

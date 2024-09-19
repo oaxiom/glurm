@@ -12,5 +12,7 @@
 ./sbatch test.slurm
 ./sbatch test.slurm
 ./sbatch test.slurm -c 14
+./sbatch test.slurm --mem 16G
+./sbatch test.slurm --mem 9M
 
 
