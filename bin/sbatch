@@ -66,12 +66,14 @@ if __name__ == '__main__':
                 sbatches.append(line)
 
     if sbatches:
-        parse_supported_SBATCH(sbatches, args)
+        parse_supported_SBATCH(sbatches, args, log=log)
 
     if not __found_shebang:
         msg = f"Slurm script did not contain a #! line"
         log.error(msg)
         sys.exit(msg)
+
+    print(args.export)
 
     db = db(log=log, init=False)
 

@@ -1,7 +1,7 @@
 
 
 
-def parse_supported_SBATCH(list_of_SBATCH, args):
+def parse_supported_SBATCH(list_of_SBATCH, args, log):
 
     for line in list_of_SBATCH:
         line = line.lstrip('#SBATCH ').strip()
@@ -25,6 +25,22 @@ def parse_supported_SBATCH(list_of_SBATCH, args):
         # -e, --error
 
         else:
-            print('#SBATCH directive is not supported: {line}')
+            log.warning('#SBATCH directive is not supported: {line}')
 
     return
+
+def parse_exports(args_exports) -> dict:
+
+    t = args_exports.split(',')
+    new_export = {}
+    
+    for value in t:
+        if value == 'ALL': # We assume ALL in the default case
+            pass # Don't add it
+            
+        elif '=' in value: # Variables to pass to the script
+            kv = value.split('=')
+            new_export[kv[0].strip()] = kv[1].strip()
+            # TODO: Deal with improperly formed exports
+        
+    return new_export

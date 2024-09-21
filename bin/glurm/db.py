@@ -9,6 +9,7 @@ import stat
 import threading
 
 from .utils import convert_seconds, pid_exists, bytes_convertor2
+from .parsers import parse_exports
 
 class ThreadWithReturnValue(threading.Thread):
     def __init__(self, group=None, target=None, name=None, args=(), kwargs={}, Verbose=None):
@@ -39,12 +40,17 @@ def submit_job(job, node):
     else:
         stderr = stdout # Both can be None
 
+    args_export = None
+    if job['exports']:
+        args_export = parse_exports(job['exports'])
+
     cmd = subprocess.Popen(
         tmp_filename,
         stdout=stdout,
         stderr=stderr,
         cwd=job['cwd'],
         shell=True,
+        env=args_export,
         )
 
     PID = cmd.pid
@@ -92,6 +98,7 @@ class db:
             memory INT,
             stdout TEXT,
             stderr TEXT,
+            exports TEXT,
             tmp_filename TEXT,
             node_used INT
             )
@@ -288,6 +295,7 @@ class db:
             'memory': args.mem,
             'stdout': args.output,
             'stderr': args.error,
+            'exports': args.export,
             'tmp_filename': '',
             'node_used': -1,
             }
@@ -311,14 +319,9 @@ class db:
         """
         node_data = self.get_node_state(node['nid'])
 
-        cpus_to_allocate = job['ncpus']
-        mem_to_allocate = job['memory']
-
-        print(cpus_to_allocate, mem_to_allocate, node_data)
-
-        if cpus_to_allocate > node_data['ncpus_avail']:
+        if job['ncpus'] > node_data['ncpus_avail']:
             return False
-        if mem_to_allocate > node_data['mem_avail']:
+        if job['memory'] > node_data['mem_avail']:
             return False
 
         # Can't see a reason it can't be allocated to this node;

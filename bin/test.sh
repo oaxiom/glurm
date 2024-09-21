@@ -3,7 +3,7 @@
 
 NPROC=$(echo 2)
 
-./sbatch test.slurm -J testing123 --export=ALL,npc=1,st='string value',
+./sbatch test.slurm -J testing123 --export=ALL,npc=1,st='string value'
 ./sbatch test.slurm -c 2
 ./sbatch test.slurm -c 4
 ./sbatch test.slurm -c 4
