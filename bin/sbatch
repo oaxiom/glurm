@@ -79,6 +79,11 @@ if __name__ == '__main__':
     # parse the memory string to deal with things like k, M, G, etc.
     args.mem = bytes_convertor2(args.mem)
 
+    if args.cpus_per_task <= 0: 
+        msg = f"cpus_per_task='{args.cpus_per_task}' is not valid. Must be >= 1"
+        log.error(msg)
+        sys.exit(msg)
+
     # Check CPUs
     if not db.can_any_node_can_accomodate_job(args.cpus_per_task, args.mem): # TODO: add memory and other asks.
         b = bytes_convertor_f(args.mem)

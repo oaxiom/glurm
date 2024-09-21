@@ -434,7 +434,7 @@ class db:
                 # TODO: Add things like node job distribution logic.
                 for node in node_status:
                     if node['status'] == 'I' or node['status'] == 'M':
-                        # Yes, free node.
+                        # Yes, some space on a node.
                         if self.node_can_accomodate_job(job, node):
                             self.allocate_job_to_node(job, node)
                             self.log.info(f'Allocated JID={job["jid"]} to node {node["nid"]}')
