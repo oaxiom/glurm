@@ -73,8 +73,6 @@ if __name__ == '__main__':
         log.error(msg)
         sys.exit(msg)
 
-    print(args.export)
-
     db = db(log=log, init=False)
 
     # Step 2. Can at least one node accommodate this task?

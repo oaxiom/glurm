@@ -356,7 +356,6 @@ class db:
         thread = ThreadWithReturnValue(target=submit_job, args=(job, node))
         thread.start()
         PID = thread.join()
-        self.log.info(f'Started {job["jid"]} with PID {PID}')
 
         #self.cur.execute('UPDATE jobs SET tmp_filename=?, pid=? WHERE jid=?', (tmp_filename, PID, job['jid']))
         self.cur.execute('UPDATE jobs SET pid=? WHERE jid=?', (PID, job['jid']))
@@ -442,7 +441,7 @@ class db:
                         # Yes, some space on a node.
                         if self.node_can_accomodate_job(job, node):
                             self.allocate_job_to_node(job, node)
-                            self.log.info(f'Allocated JID={job["jid"]} to node {node["nid"]}')
+                            self.log.info(f'Allocated JID={job["jid"]} to node {node["nid"]} with PID={job["pid"]}')
                             break
 
         return

@@ -6,7 +6,7 @@ echo
 echo 'Env:'
 echo npc = ${npc}
 echo st = ${st}
-echo NPROC = $NPROC
+echo CPUS = $CPUS
 echo 
 
 hostname
