@@ -2,6 +2,11 @@
 
 echo "Started Job"
 
+echo 'Env:'
+echo npc = ${npc}
+echo st = ${st}
+echo NPROC = $NPROC
+
 hostname
 
 pwd

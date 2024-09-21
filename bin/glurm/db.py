@@ -311,8 +311,10 @@ class db:
         """
         node_data = self.get_node_state(node['nid'])
 
-        cpus_to_allocate = node_data['cpus_allocated']+job['ncpus']
-        mem_to_allocate = node_data['mem_allocated']+job['memory']
+        cpus_to_allocate = job['ncpus']
+        mem_to_allocate = job['memory']
+
+        print(cpus_to_allocate, mem_to_allocate, node_data)
 
         if cpus_to_allocate > node_data['ncpus_avail']:
             return False
