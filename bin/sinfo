@@ -13,7 +13,7 @@ if __name__ == '__main__':
 
     nodes = db.get_node_states(idle_or_mixed_only=False)
 
-    print(f'{"NODE":<15}{"CPUS":<7}{"MEMORY":<12}{"STATUS":<8}')
+    print(f'{"NODE":<15}{"CPUS":<8}{"MEMORY":<16}{"STATUS":<10}')
     for node in nodes:
         status = codes.node_status[node['status']]
 
@@ -24,5 +24,5 @@ if __name__ == '__main__':
         cpus_allocated = f"{node['cpus_allocated']}/{node['ncpus_total']}"
         mem_allocated = f"{mem_alloc}/{mem_total}G"
 
-        print(f"{node['nid']:<15}{cpus_allocated:<7}{mem_allocated:<12}{status:<8}")
+        print(f"{node['nid']:<15}{cpus_allocated:<8}{mem_allocated:<16}{status:<10}")
 
