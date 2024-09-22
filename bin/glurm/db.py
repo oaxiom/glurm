@@ -8,7 +8,7 @@ import random
 import stat
 import threading
 
-from .utils import convert_seconds, pid_exists, bytes_convertor2
+from .utils import convert_seconds, pid_exists, bytes_convertor2, get_memory
 from .parsers import parse_exports
 
 class ThreadWithReturnValue(threading.Thread):
@@ -131,10 +131,13 @@ class db:
                 )
         '''
         self.cur.execute(node_table)
-        #svmem = psutil.virtual_memory()
+        
+        mem = get_memory()
+        #mem = psutil.virtual_memory()
+        
         data = dict(
             ncpus = os.cpu_count(),
-            mem = bytes_convertor2('8G'), # Surpsringly no easy way to do this...
+            mem = mem, 
             nid = 'node001',
             status = 'I',
             ncpus_alloc = 0,
