@@ -8,7 +8,8 @@ import random
 import stat
 import threading
 
-from .utils import convert_seconds, pid_exists, bytes_convertor2
+from .utils import convert_seconds, pid_exists, bytes_convertor2, get_memory
+from .parsers import parse_exports
 
 class ThreadWithReturnValue(threading.Thread):
     def __init__(self, group=None, target=None, name=None, args=(), kwargs={}, Verbose=None):
@@ -39,12 +40,17 @@ def submit_job(job, node):
     else:
         stderr = stdout # Both can be None
 
+    args_export = None
+    if job['exports']:
+        args_export = parse_exports(job['exports'])
+
     cmd = subprocess.Popen(
         tmp_filename,
         stdout=stdout,
         stderr=stderr,
         cwd=job['cwd'],
         shell=True,
+        env=args_export,
         )
 
     PID = cmd.pid
@@ -92,6 +98,7 @@ class db:
             memory INT,
             stdout TEXT,
             stderr TEXT,
+            exports TEXT,
             tmp_filename TEXT,
             node_used INT
             )
@@ -124,10 +131,13 @@ class db:
                 )
         '''
         self.cur.execute(node_table)
-        #svmem = psutil.virtual_memory()
+        
+        mem = get_memory()
+        #mem = psutil.virtual_memory()
+        
         data = dict(
             ncpus = os.cpu_count(),
-            mem = bytes_convertor2('8G'), # Surpsringly no easy way to do this...
+            mem = mem, 
             nid = 'node001',
             status = 'I',
             ncpus_alloc = 0,
@@ -288,6 +298,7 @@ class db:
             'memory': args.mem,
             'stdout': args.output,
             'stderr': args.error,
+            'exports': args.export,
             'tmp_filename': '',
             'node_used': -1,
             }
@@ -311,12 +322,9 @@ class db:
         """
         node_data = self.get_node_state(node['nid'])
 
-        cpus_to_allocate = node_data['cpus_allocated']+job['ncpus']
-        mem_to_allocate = node_data['mem_allocated']+job['memory']
-
-        if cpus_to_allocate > node_data['ncpus_avail']:
+        if job['ncpus'] > node_data['ncpus_avail']:
             return False
-        if mem_to_allocate > node_data['mem_avail']:
+        if job['memory'] > node_data['mem_avail']:
             return False
 
         # Can't see a reason it can't be allocated to this node;
@@ -351,7 +359,6 @@ class db:
         thread = ThreadWithReturnValue(target=submit_job, args=(job, node))
         thread.start()
         PID = thread.join()
-        self.log.info(f'Started {job["jid"]} with PID {PID}')
 
         #self.cur.execute('UPDATE jobs SET tmp_filename=?, pid=? WHERE jid=?', (tmp_filename, PID, job['jid']))
         self.cur.execute('UPDATE jobs SET pid=? WHERE jid=?', (PID, job['jid']))
@@ -434,10 +441,10 @@ class db:
                 # TODO: Add things like node job distribution logic.
                 for node in node_status:
                     if node['status'] == 'I' or node['status'] == 'M':
-                        # Yes, free node.
+                        # Yes, some space on a node.
                         if self.node_can_accomodate_job(job, node):
                             self.allocate_job_to_node(job, node)
-                            self.log.info(f'Allocated JID={job["jid"]} to node {node["nid"]}')
+                            self.log.info(f'Allocated JID={job["jid"]} to node {node["nid"]} with PID={job["pid"]}')
                             break
 
         return

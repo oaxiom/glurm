@@ -28,6 +28,16 @@ def bytes_convertor_f(b:int) -> str:
     g = m / KB**1
     return {'b': b, 'k': k, 'M': m, 'G': g}
 
+def get_memory():
+    from .platform import LINUX, OSX, WINDOWS # Supported
+    import subprocess
+
+    if LINUX:
+        return 10000000000 # free ?
+    elif OSX:
+        res = subprocess.run('sysctl -a  | grep hw.memsize', shell=True, capture_output=True)
+        return int(res.stdout.decode().split(':')[1].strip())
+
 def bytes_convertor2(mem:str) -> int:
     KB = 1024
 
