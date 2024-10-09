@@ -34,6 +34,7 @@ def get_memory():
 
     if LINUX:
         res = subprocess.run('free', shell=True, capture_output=True)
+        print(res)
         return int(res.stdout.decode().split('\n')[1].strip().split()[1])
     elif OSX:
         res = subprocess.run('sysctl -a  | grep hw.memsize', shell=True, capture_output=True)
