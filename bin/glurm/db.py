@@ -63,11 +63,13 @@ class db:
 
         # Do we need to do an setup?
         if not os.path.exists(os.path.expanduser('~/.glurm')):
-            if not init: raise AssertionError('System not initialized')
+            if not init:
+                raise AssertionError('System not initialized')
             os.mkdir(os.path.expanduser('~/.glurm/'))
 
         if not os.path.exists(os.path.expanduser('~/.glurm/database.db')):
-            if not init: raise AssertionError('System not initialized')
+            if not init:
+                raise AssertionError('System not initialized')
             self.setup()
 
         # TODO: Test integrity of database.db
@@ -131,13 +133,13 @@ class db:
                 )
         '''
         self.cur.execute(node_table)
-        
+
         mem = get_memory()
         #mem = psutil.virtual_memory()
-        
+
         data = dict(
             ncpus = os.cpu_count(),
-            mem = mem, 
+            mem = mem,
             nid = 'node001',
             status = 'I',
             ncpus_alloc = 0,
